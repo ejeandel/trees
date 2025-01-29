@@ -87,6 +87,8 @@ function html(tree, math)
 	 end
 	 if t.children ~= 0 then
 	    td = td .. " style=\"text-align:center;border-top:2px solid\""
+	 else
+	    td = td .. " style=\"text-align:center\""
 	 end
 	 	  
 	 current_string = current_string .. "<td " .. td .. ">"
