@@ -26,27 +26,35 @@ end
 -- Convert a json tree into a tree 
 function process(tree, lvl)
    local name, children  = next(tree)
-   for i,v in ipairs(children) do
-      process(v, lvl+1 )
-   end
+   if children ~= 0 then
+      for i,v in ipairs(children) do
+	 process(v, lvl+1 )
+      end
+   end   
+   
    tree.level = lvl
    tree.name = name
    tree.children = children
    tree[name] = nil
-   w = 0
-   d = lvl
-   for i,v in ipairs(tree.children) do
-      if v.depth > d then
-         d = v.depth
+   if tree.children ~= 0 then
+      local w = 0
+      local d = lvl
+      for i,v in ipairs(tree.children) do
+	 if v.depth > d then
+	    d = v.depth
+	 end
+	 w = w + v.width
       end
-      w = w + v.width
+      tree.depth = d
+      if w == 0 then
+	 w = 1
+      end
+      tree.width = w
+   else
+      tree.width = 1
+      tree.depth = 1      
    end
-   tree.depth = d
-   if w == 0 then
-      w = 1
-   end
-   tree.width = w
-   tree.dummy = false
+      tree.dummy = false
 end
 
 
@@ -72,12 +80,16 @@ function html(tree, math)
          if t.level < max_level then
             Queue.push(queue, {dummy =  true, level =  t.level+1})
          end                     
-      else         
-         if t.width > 1 then
-            current_string = current_string .. "<td style=\"text-align:center;border-top:2px solid\" colspan=\"" .. t.width  .. "\">"
-         else
-            current_string = current_string .. "<td style=\"text-align:center;border-top:2px solid\" >"
-         end
+      else
+	 td = ""
+	 if t.width > 1 then
+	   td = td .. " colspan=\"" .. t.width .. "\""
+	 end
+	 if t.children ~= 0 then
+	    td = td .. " style=\"text-align:center;border-top:2px solid\""
+	 end
+	 	  
+	 current_string = current_string .. "<td " .. td .. ">"
 
          if math then
             current_string = current_string .. "<span class=" ..'"' .. "math inline" .. '"' .. ">" .. "\\("
@@ -88,7 +100,7 @@ function html(tree, math)
             current_string = current_string .. "\\)</span>"
          end
          current_string = current_string .. "</td>"
-         if #t.children > 0 then
+         if t.children ~=0 and #t.children > 0 then
             for i,c in ipairs(t.children) do            
                Queue.push(queue, c)
             end
@@ -110,10 +122,16 @@ end
 
 function tex_dfs(tree)
    s = ""
-   for i,c in ipairs(tree.children) do
-      s = s .. tex_dfs(c)
+
+   if tree.children ~= 0 then    
+      for i,c in ipairs(tree.children) do
+	 s = s .. tex_dfs(c)
+      end
+      
+      s = s .. "\\infer" .. #tree.children .. "{" .. tree.name .. "}\n"
+   else
+      s = s .. "\\hypo{"  .. tree.name .. "}\n"
    end
-   s = s .. "\\infer" .. #tree.children .. "{" .. tree.name .. "}\n"
    return s
 end
 
