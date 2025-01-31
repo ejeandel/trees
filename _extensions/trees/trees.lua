@@ -23,6 +23,11 @@ function Queue.pop (queue)
   return value
 end
 
+
+function sanitize(x)
+   return pandoc.Pandoc({ pandoc.Plain(x.blocks[1].content)})
+end
+
 -- Convert a json tree into a tree 
 function process(tree, lvl)
    local name, children  = next(tree)
@@ -59,7 +64,7 @@ end
 
 
 -- print_html, uses breadth first search 
-function html(tree, math)
+function html(tree, no_math)
    queue = Queue.new()
    current_level = 0
    max_level = tree.depth
@@ -90,17 +95,15 @@ function html(tree, math)
 	 else
 	    td = td .. " style=\"text-align:center\""
 	 end
-	 	  
+	 
 	 current_string = current_string .. "<td " .. td .. ">"
-
-         if math then
-            current_string = current_string .. "<span class=" ..'"' .. "math inline" .. '"' .. ">" .. "\\("
-         end
-      
-         current_string = current_string .. t.name
-         if math then
-            current_string = current_string .. "\\)</span>"
-         end
+	 print(no_math)
+	 if no_math then
+	    name = pandoc.write(sanitize(pandoc.read(t.name, 'markdown')), FORMAT, pandoc.WriterOptions({html_math_method = PANDOC_WRITER_OPTIONS.html_math_method}))
+	 else
+	    name = pandoc.write(sanitize(pandoc.read('$' .. t.name .. '$', 'markdown')), FORMAT, pandoc.WriterOptions({html_math_method = PANDOC_WRITER_OPTIONS.html_math_method}))
+	 end
+         current_string = current_string .. name
          current_string = current_string .. "</td>"
          if t.children ~=0 and #t.children > 0 then
             for i,c in ipairs(t.children) do            
@@ -124,7 +127,8 @@ end
 
 function tex_dfs(tree)
    s = ""
-
+   name = pandoc.write(sanitize(pandoc.read(tree.name, 'markdown')), FORMAT)
+   
    if tree.children ~= 0 then    
       for i,c in ipairs(tree.children) do
 	 s = s .. tex_dfs(c)
@@ -139,20 +143,31 @@ end
 
    
 
-function tex(tree)
-   return "\\begin{prooftree}\n" .. tex_dfs(tree) .. "\\end{prooftree}\n" 
+function tex(tree,no_math)
+   if no_math then
+      return "\\begin{prooftree}[template=(\\inserttext)]\n" .. tex_dfs(tree) .. "\\end{prooftree}\n"      
+   else
+      return "\\begin{prooftree}\n" .. tex_dfs(tree) .. "\\end{prooftree}\n"
+   end
 end
 
 
 
+
+
 function CodeBlock(el, args)
-   if el.classes:find("tree") then      
+   if el.classes:find("tree") then
       tree = pandoc.json.decode(el.text, false)
       process(tree,0)
-      if FORMAT == "html" then 
-	 return pandoc.RawInline('html', html(tree, true))
-      elseif FORMAT == "latex" then 
-	 return pandoc.RawInline('tex', tex(tree, true))
+      no_math = el.classes:find("no-math") ~= nil
+      if FORMAT == "html" then
+	 -- local html_text = html(tree, true)
+	 --local html_markdown = pandoc.read(html_text, 'markdown')
+	 -- return pandoc.RawInline('html', pandoc.write(html_markdown, 'html'))
+	 return pandoc.RawInline('html', html(tree, no_math))
+      elseif FORMAT == "latex" then
+	 quarto.doc.use_latex_package("ebproof")
+	 return pandoc.RawInline('tex', tex(tree, no_math))
       else
 	 error("trees not implemented for " .. FORMAT)
       end
